@@ -1,0 +1,50 @@
+name: Mirror EPG to GitHub Pages
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  update-epg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Ensure gh-pages branch exists
+        run: |
+          if ! git rev-parse --verify gh-pages >/dev/null 2>&1; then
+            echo "Creating gh-pages branch..."
+            git checkout --orphan gh-pages
+            rm -rf *
+            echo "<html><body>EPG Mirror Ready</body></html>" > index.html
+            git add .
+            git commit -m "Initialize gh-pages branch"
+            git push -f origin gh-pages
+          fi
+
+      - name: Switch to gh-pages
+        run: |
+          git fetch origin gh-pages
+          git checkout gh-pages
+
+      - name: Download EPG file
+        run: |
+          curl -L "http://epg.one/epg2.xml" -o epg2.xml
+
+      - name: Commit and push updates
+        run: |
+          git add epg2.xml
+          git commit -m "Update EPG at $(date -u '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+          git push origin gh-pages
